@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                  xmlns:gs="http://ccfit.nsu.ru/schema/crack-hash-response">
+    <soapenv:Header/>
+    <soapenv:Body>
+        <gs:CrackHashWorkerResponse>
+            <gs:RequestId>123e4567-e89b-12d3-a456-426614174000</gs:RequestId>
+            <gs:PartNumber>1</gs:PartNumber>
+            <gs:Answers>
+                <gs:words>password123</gs:words>
+                <gs:words>qwerty</gs:words>
+                <gs:words>123456</gs:words>
+            </gs:Answers>
+        </gs:CrackHashWorkerResponse>
+    </soapenv:Body>
+</soapenv:Envelope>
