@@ -98,7 +98,7 @@ docker compose -f docker-compose.yml up -d
 ```json
 {
    "status": "PARTIAL_ERROR",
-   "data": [bot23]
+   "data": ["bot23"]
 }
 ```
 
