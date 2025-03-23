@@ -90,7 +90,7 @@ docker compose -f docker-compose.yml up -d
 ```json
 {
    "status": "ERROR",
-   "data": []
+   "data": null
 }
 ```
 
