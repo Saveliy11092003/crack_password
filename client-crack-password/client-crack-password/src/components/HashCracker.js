@@ -71,7 +71,7 @@ export default function HashCracker() {
                 <div>
                     <p>Status:</p>
                     <p>{status}</p>
-                    {status === "ERROR" && <p>Произошла ошибка в сервисе, результат не полный.</p>}
+                    {status === "PARTIAL_ERROR" && <p>Произошла ошибка в сервисе, результат не полный.</p>}
                 </div>
             )}
 

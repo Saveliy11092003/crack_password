@@ -150,7 +150,10 @@ public class ManagerService {
 
     synchronized public void updateRequestsAfterErrorHealthCheck() {
         for (Map.Entry<String, PasswordRequest> entry : requests.entrySet()) {
-            if (entry.getValue().getSuccessWork() != 3) {
+            System.out.println("success work" + entry.getValue().getSuccessWork());
+            if (entry.getValue().getSuccessWork() > 0) {
+                entry.getValue().setStatus(PARTIAL_READY);
+            } else if (entry.getValue().getSuccessWork() == 0) {
                 entry.getValue().setStatus(ERROR);
             }
         }
