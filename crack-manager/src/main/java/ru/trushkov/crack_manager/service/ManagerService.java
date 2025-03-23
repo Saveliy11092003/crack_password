@@ -91,9 +91,13 @@ public class ManagerService {
     }
 
     private void addNewRequest(CrackPasswordDto crackPasswordDto) {
-        requests.put(crackPasswordDto.getRequestId(), PasswordRequest.builder().status(IN_PROGRESS).data(new CopyOnWriteArrayList<>())
-                .successWork(0).maxLength(crackPasswordDto.getLength()).build());
+        requests.put(crackPasswordDto.getRequestId(), getPasswordRequest(crackPasswordDto));
         requestQueue.add(crackPasswordDto);
+    }
+
+    private PasswordRequest getPasswordRequest(CrackPasswordDto crackPasswordDto) {
+        return PasswordRequest.builder().status(IN_PROGRESS).data(new CopyOnWriteArrayList<>())
+                .successWork(0).maxLength(crackPasswordDto.getLength()).build();
     }
 
     private void doRequests(CrackPasswordDto crackPasswordDto) {
@@ -156,7 +160,15 @@ public class ManagerService {
         RestTemplate restTemplate = new RestTemplate();
         long currentCount = 0;
         for (String url : urlsIndex) {
-            currentCount += restTemplate.postForObject(url, requestId, Integer.class);
+            Integer part = null;
+            try {
+                part = restTemplate.postForObject(url, requestId, Integer.class);
+            } catch (Exception e) {
+                System.out.println("Error while getting index : " + e.getMessage());
+            }
+            if (part != null) {
+                currentCount += part;
+            }
             System.out.println("current in cycle " + currentCount);
         }
         System.out.println("current after cycle " + currentCount);

@@ -15,6 +15,8 @@ export default function HashCracker() {
             const id = await crackHash(hash, length);
             setRequestId(id);
             setProgress(0);
+            setStatus("");
+            setData([]);
         } catch (error) {
             console.error("Ошибка при отправке запроса:", error);
         }
