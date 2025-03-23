@@ -151,7 +151,7 @@ public class ManagerService {
     synchronized public void updateRequestsAfterErrorHealthCheck() {
         for (Map.Entry<String, PasswordRequest> entry : requests.entrySet()) {
             System.out.println("success work" + entry.getValue().getSuccessWork());
-            if (entry.getValue().getSuccessWork() > 0) {
+            if (entry.getValue().getSuccessWork() > 0 && !entry.getValue().getSuccessWork().equals(workersCount)) {
                 entry.getValue().setStatus(PARTIAL_READY);
             } else if (entry.getValue().getSuccessWork() == 0) {
                 entry.getValue().setStatus(ERROR);
