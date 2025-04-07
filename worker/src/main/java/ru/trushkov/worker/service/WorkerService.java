@@ -7,7 +7,13 @@ import jakarta.xml.bind.JAXBException;
 import jakarta.xml.bind.Marshaller;
 import lombok.RequiredArgsConstructor;
 import org.paukov.combinatorics3.Generator;
+import org.springframework.amqp.core.AmqpTemplate;
+import org.springframework.amqp.core.MessageDeliveryMode;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
+import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -32,8 +38,21 @@ public class WorkerService {
     @Value("${url.possible.password}")
     private String urlPossiblePassword;
 
+    @Value("${exchange.name}")
+    private String exchangeName;
+
+    private final AmqpTemplate amqpTemplate;
+
+    @RabbitListener(queues = "request_queue_1")
     public void task(CrackHashManagerRequest request) {
+        try {
+            Thread.sleep(10000);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
         currentRequestId = request.getRequestId();
+        System.out.println("I am here");
+        System.out.println("Request " + request.getRequestId() + " " + request.getHash() + " " + request.getMaxLength());
         currentIndex.set(0);
         Stream<String> permutations = Generator.permutation(request.getAlphabet().getSymbols())
                 .withRepetitions(request.getMaxLength()).stream().map(list -> String.join("", list));
@@ -43,20 +62,32 @@ public class WorkerService {
         sendPossiblePasswords(crackHashWorkerResponse);
     }
 
+    @Bean
+    public MessageConverter converter() {
+        return new Jackson2JsonMessageConverter();
+    }
+
     private void sendPossiblePasswords(CrackHashWorkerResponse crackHashWorkerResponse) {
-        String soapRequest = getXmlMessage(crackHashWorkerResponse);
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.TEXT_XML);
+  //      String soapRequest = getXmlMessage(crackHashWorkerResponse);
+   //     HttpHeaders headers = new HttpHeaders();
+  //      headers.setContentType(MediaType.TEXT_XML);
 
-        HttpEntity<String> requestEntity = new HttpEntity<>(soapRequest, headers);
+       // HttpEntity<String> requestEntity = new HttpEntity<>(soapRequest, headers);
 
-        RestTemplate restTemplate = new RestTemplate();
-        restTemplate.exchange(
-                urlPossiblePassword,
-                HttpMethod.POST,
-                requestEntity,
-                String.class
-        );
+        System.out.println("do rabbit");
+        amqpTemplate.convertAndSend(exchangeName, "task.manager", crackHashWorkerResponse,
+                message -> {
+                    message.getMessageProperties().setDeliveryMode(MessageDeliveryMode.PERSISTENT);
+                    return message;
+                });
+        //RestTemplate restTemplate = new RestTemplate();
+       // restTemplate.exchange(
+      //          urlPossiblePassword,
+      //          HttpMethod.POST,
+    //            requestEntity,
+     //           String.class
+    //    );
+        System.out.println("posle rabbit");
     }
 
     private String getXmlMessage(CrackHashWorkerResponse crackHashWorkerResponse) {

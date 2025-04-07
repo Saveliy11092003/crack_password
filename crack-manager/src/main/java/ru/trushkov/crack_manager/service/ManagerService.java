@@ -2,6 +2,12 @@ package ru.trushkov.crack_manager.service;
 
 import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
+import org.springframework.amqp.core.AmqpTemplate;
+import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.MessageDeliveryMode;
+import org.springframework.amqp.core.MessageProperties;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -19,8 +25,13 @@ import ru.nsu.ccfit.schema.crack_hash_response.CrackHashWorkerResponse;
 import ru.trushkov.crack_manager.model.CrackPasswordDto;
 import ru.trushkov.crack_manager.model.PasswordDto;
 import ru.trushkov.crack_manager.model.PasswordRequest;
+import ru.trushkov.crack_manager.model.entity.Request;
+import ru.trushkov.crack_manager.model.entity.Response;
 import ru.trushkov.crack_manager.model.enumeration.Status;
+import ru.trushkov.crack_manager.repository.RequestRepository;
+import ru.trushkov.crack_manager.repository.ResponseRepository;
 
+import java.sql.SQLOutput;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -28,6 +39,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static ru.trushkov.crack_manager.model.enumeration.Status.*;
 
 @Service
+@RequiredArgsConstructor
 public class ManagerService {
 
     @Value("${alphabet}")
@@ -48,10 +60,16 @@ public class ManagerService {
 
     private AtomicBoolean canWork = new AtomicBoolean(true);
 
-    public ManagerService() {
-        startProcessingQueue();
-    }
+    private final RequestRepository repository;
 
+    private final ResponseRepository responseRepository;
+
+    private final AmqpTemplate amqpTemplate;
+
+    @Value("${exchange.name}")
+    private String exchangeName;
+
+/*
     public void startProcessingQueue() {
         Runnable processor = () -> {
             while (true) {
@@ -74,19 +92,53 @@ public class ManagerService {
         Thread thread = new Thread(processor);
         thread.start();
     }
-
+*/
     public String crackPassword(CrackPasswordDto crackPasswordDto) {
         String requestId = UUID.randomUUID().toString();
         crackPasswordDto.setRequestId(requestId);
+        System.out.println("do");
+        addRequestToBD(crackPasswordDto);
         addNewRequest(crackPasswordDto);
-        //doRequests(crackPasswordDto);
+        System.out.println(getRequest(requestId));
+        doRequests(crackPasswordDto);
+        System.out.println("posle");
         return requestId;
     }
 
+    private Request getRequest(String id) {
+        return repository.findById(id).get();
+    }
+
+    private void addRequestToBD(CrackPasswordDto crackPasswordDto) {
+        Request request = Request.builder().id(crackPasswordDto.getRequestId()).length(crackPasswordDto.getLength())
+                .hash(crackPasswordDto.getHash()).build();
+        repository.save(request);
+    }
+
     public PasswordDto getPasswords(String requestId) {
-        PasswordRequest passwordRequest = requests.get(requestId);
-        PasswordDto passwordDto = PasswordDto.builder().data(passwordRequest.getData())
-                .status(passwordRequest.getStatus()).build();
+    //    PasswordRequest passwordRequest = requests.get(requestId);
+     //   PasswordDto passwordDto = PasswordDto.builder().data(passwordRequest.getData())
+     //           .status(passwordRequest.getStatus()).build();
+
+        List<Response> responses = responseRepository.findAllByRequestId(requestId);
+        System.out.println("RESPONSES " + responses);
+        PasswordDto passwordDto1 = getPasswordDto(responses);
+        System.out.println("FINALLY RESPONSE " + responses);
+        return passwordDto1;
+    }
+
+    private PasswordDto getPasswordDto(List<Response> responses) {
+        PasswordDto passwordDto = new PasswordDto();
+        if (responses.size() >= 3) {
+            passwordDto.setStatus(READY);
+        } else if (!responses.isEmpty()) {
+            passwordDto.setStatus(PARTIAL_READY);
+        } else {
+            passwordDto.setStatus(IN_PROGRESS);
+        }
+        Set<String> data = new HashSet<>();
+        responses.forEach((r) -> data.addAll(r.getAnswers()));
+        passwordDto.setData(data);
         return passwordDto;
     }
 
@@ -103,25 +155,23 @@ public class ManagerService {
     private void doRequests(CrackPasswordDto crackPasswordDto) {
         System.out.println("do request");
         for (int i = 0; i < workersCount; i++) {
-            doRequest(crackPasswordDto, i, urlsCrackPassword.get(i), crackPasswordDto.getRequestId());
+            doRequest(crackPasswordDto, i, crackPasswordDto.getRequestId());
         }
     }
 
-    private void doRequest(CrackPasswordDto crackPasswordDto, Integer number, String url, String requestId) {
-        RestTemplate restTemplate = new RestTemplate();
+    private void doRequest(CrackPasswordDto crackPasswordDto, Integer number, String requestId) {
         CrackHashManagerRequest crackHashManagerRequest = createCrackHashManagerRequest(crackPasswordDto, number, requestId);
         System.out.println(crackHashManagerRequest.getAlphabet().getSymbols());
         System.out.println(crackHashManagerRequest.getRequestId());
         System.out.println(crackHashManagerRequest.getHash());
         System.out.println(crackHashManagerRequest.getAlphabet().getSymbols());
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Content-Type", "application/json");
-        HttpEntity<CrackHashManagerRequest> request = new HttpEntity<>(crackHashManagerRequest, headers);
-        Runnable runnable = () -> {
-            restTemplate.postForObject(url, request, CrackHashManagerRequest.class);
-        };
-        Thread requestThread = new Thread(runnable);
-        requestThread.start();
+        System.out.println("do convert");
+        amqpTemplate.convertAndSend(exchangeName, "task.worker1", crackHashManagerRequest,
+                message -> {
+                    message.getMessageProperties().setDeliveryMode(MessageDeliveryMode.PERSISTENT);
+                    return message;
+                });
+        System.out.println("posle convert");
     }
 
     private CrackHashManagerRequest createCrackHashManagerRequest(CrackPasswordDto crackPasswordDto, Integer number, String requestId) {
@@ -137,15 +187,29 @@ public class ManagerService {
         return crackHashManagerRequest;
     }
 
+    @RabbitListener(queues = "response_queue")
      synchronized public void changeRequest(CrackHashWorkerResponse response) {
         String requestId = response.getRequestId();
-        requests.get(requestId).getData().addAll(response.getAnswers().getWords());
-        requests.get(requestId).setSuccessWork(requests.get(requestId).getSuccessWork() + 1);
-        if (requests.get(requestId).getSuccessWork() == 3) {
-            requests.get(requestId).setStatus(READY);
-            canWork.set(true);
-            System.out.println("can work = true");
+     //   System.out.println("RESPONSE " + response.getAnswers().getWords().get(0) + " " + response.getPartNumber() + " " + response.getRequestId());
+    //    requests.get(requestId).getData().addAll(response.getAnswers().getWords());
+    //    requests.get(requestId).setSuccessWork(requests.get(requestId).getSuccessWork() + 1);
+   //     if (requests.get(requestId).getSuccessWork() == 3) {
+   //         requests.get(requestId).setStatus(READY);
+   //         canWork.set(true);
+   //         System.out.println("can work = true");
+  //      }
+        try {
+            Thread.sleep(5000);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
         }
+        addResponseToBD(response);
+    }
+
+    private void addResponseToBD(CrackHashWorkerResponse crackHashWorkerResponse) {
+        Response response = Response.builder().id(UUID.randomUUID().toString()).answers(crackHashWorkerResponse.getAnswers().getWords())
+                .partNumber(crackHashWorkerResponse.getPartNumber()).requestId(crackHashWorkerResponse.getRequestId()).build();
+        responseRepository.save(response);
     }
 
     synchronized public void updateRequestsAfterErrorHealthCheck() {
@@ -153,9 +217,10 @@ public class ManagerService {
             System.out.println("success work" + entry.getValue().getSuccessWork());
             if (entry.getValue().getSuccessWork() > 0 && !entry.getValue().getSuccessWork().equals(workersCount)) {
                 entry.getValue().setStatus(PARTIAL_READY);
-            } else if (entry.getValue().getSuccessWork() == 0) {
-                entry.getValue().setStatus(ERROR);
             }
+            //else if (entry.getValue().getSuccessWork() == 0) {
+            //    entry.getValue().setStatus(ERROR);
+            //}
         }
     }
 

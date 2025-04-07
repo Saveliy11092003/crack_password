@@ -14,6 +14,7 @@ public class ManagerEndpoint {
 
     @PayloadRoot(namespace = "http://ccfit.nsu.ru/schema/crack-hash-response", localPart = "CrackHashWorkerResponse")
     public void getCountry(@RequestPayload CrackHashWorkerResponse response) {
+        System.out.println("do obrabotchika");
         managerService.changeRequest(response);
     }
 

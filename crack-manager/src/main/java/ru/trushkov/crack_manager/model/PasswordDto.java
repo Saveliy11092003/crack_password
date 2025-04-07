@@ -5,6 +5,7 @@ import lombok.*;
 import ru.trushkov.crack_manager.model.enumeration.Status;
 
 import java.util.List;
+import java.util.Set;
 
 @Getter
 @Setter
@@ -15,5 +16,5 @@ public class PasswordDto {
 
     @NotNull
     private Status status;
-    private List<String> data;
+    private Set<String> data;
 }

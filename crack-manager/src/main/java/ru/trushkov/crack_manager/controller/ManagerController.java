@@ -16,6 +16,7 @@ public class ManagerController {
 
     @PostMapping("/crack")
     public ResponseEntity<String> crackPassword(@RequestBody CrackPasswordDto crackPasswordDto) {
+        System.out.println("tutututu");
         return ResponseEntity.ok(managerService.crackPassword(crackPasswordDto));
     }
 
