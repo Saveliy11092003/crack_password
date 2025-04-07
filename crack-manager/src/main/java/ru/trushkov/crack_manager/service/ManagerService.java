@@ -45,20 +45,15 @@ public class ManagerService {
     @Value("${alphabet}")
     private List<String> symbolsOfAlphabet;
 
-    private final ConcurrentHashMap<String, PasswordRequest> requests = new ConcurrentHashMap<>();
+ //   private final ConcurrentHashMap<String, PasswordRequest> requests = new ConcurrentHashMap<>();
 
-    private BlockingQueue<CrackPasswordDto> requestQueue = new LinkedBlockingQueue<>();
-
-    @Value("${workers.urls.crack.task}")
-    private List<String> urlsCrackPassword;
+  //  private BlockingQueue<CrackPasswordDto> requestQueue = new LinkedBlockingQueue<>();
 
     @Value("${workers.urls.index}")
     private List<String> urlsIndex;
 
     @Value("${workers.count}")
     private Integer workersCount;
-
-    private AtomicBoolean canWork = new AtomicBoolean(true);
 
     private final RequestRepository repository;
 
@@ -69,36 +64,12 @@ public class ManagerService {
     @Value("${exchange.name}")
     private String exchangeName;
 
-/*
-    public void startProcessingQueue() {
-        Runnable processor = () -> {
-            while (true) {
-                if (canWork.get()) {
-                    try {
-                        canWork.set(false);
-                        System.out.println("can work = false");
-                        CrackPasswordDto passwordDto = requestQueue.take();
-                        System.out.println("startProcessingQueue " + passwordDto.getRequestId());
-                        if (passwordDto != null) {
-                            doRequests(passwordDto);
-                        }
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        break;
-                    }
-                }
-            }
-        };
-        Thread thread = new Thread(processor);
-        thread.start();
-    }
-*/
     public String crackPassword(CrackPasswordDto crackPasswordDto) {
         String requestId = UUID.randomUUID().toString();
         crackPasswordDto.setRequestId(requestId);
         System.out.println("do");
         addRequestToBD(crackPasswordDto);
-        addNewRequest(crackPasswordDto);
+  //      addNewRequest(crackPasswordDto);
         System.out.println(getRequest(requestId));
         doRequests(crackPasswordDto);
         System.out.println("posle");
@@ -116,10 +87,6 @@ public class ManagerService {
     }
 
     public PasswordDto getPasswords(String requestId) {
-    //    PasswordRequest passwordRequest = requests.get(requestId);
-     //   PasswordDto passwordDto = PasswordDto.builder().data(passwordRequest.getData())
-     //           .status(passwordRequest.getStatus()).build();
-
         List<Response> responses = responseRepository.findAllByRequestId(requestId);
         System.out.println("RESPONSES " + responses);
         PasswordDto passwordDto1 = getPasswordDto(responses);
@@ -142,11 +109,11 @@ public class ManagerService {
         return passwordDto;
     }
 
-    private void addNewRequest(CrackPasswordDto crackPasswordDto) {
+ /*   private void addNewRequest(CrackPasswordDto crackPasswordDto) {
         requests.put(crackPasswordDto.getRequestId(), getPasswordRequest(crackPasswordDto));
         requestQueue.add(crackPasswordDto);
     }
-
+*/
     private PasswordRequest getPasswordRequest(CrackPasswordDto crackPasswordDto) {
         return PasswordRequest.builder().status(IN_PROGRESS).data(new CopyOnWriteArrayList<>())
                 .successWork(0).maxLength(crackPasswordDto.getLength()).build();
@@ -189,7 +156,7 @@ public class ManagerService {
 
     @RabbitListener(queues = "response_queue")
      synchronized public void changeRequest(CrackHashWorkerResponse response) {
-        String requestId = response.getRequestId();
+   //     String requestId = response.getRequestId();
      //   System.out.println("RESPONSE " + response.getAnswers().getWords().get(0) + " " + response.getPartNumber() + " " + response.getRequestId());
     //    requests.get(requestId).getData().addAll(response.getAnswers().getWords());
     //    requests.get(requestId).setSuccessWork(requests.get(requestId).getSuccessWork() + 1);
@@ -212,18 +179,6 @@ public class ManagerService {
         responseRepository.save(response);
     }
 
-    synchronized public void updateRequestsAfterErrorHealthCheck() {
-        for (Map.Entry<String, PasswordRequest> entry : requests.entrySet()) {
-            System.out.println("success work" + entry.getValue().getSuccessWork());
-            if (entry.getValue().getSuccessWork() > 0 && !entry.getValue().getSuccessWork().equals(workersCount)) {
-                entry.getValue().setStatus(PARTIAL_READY);
-            }
-            //else if (entry.getValue().getSuccessWork() == 0) {
-            //    entry.getValue().setStatus(ERROR);
-            //}
-        }
-    }
-
     public long getPercent(String requestId) {
         RestTemplate restTemplate = new RestTemplate();
         long currentCount = 0;
@@ -240,9 +195,12 @@ public class ManagerService {
             System.out.println("current in cycle " + currentCount);
         }
         System.out.println("current after cycle " + currentCount);
-        long totalCount = (long) Math.pow(36, requests.get(requestId).getMaxLength());
+        long totalCount = (long) Math.pow(36, repository.findById(requestId).get().getLength());
         System.out.println("total " + totalCount);
         System.out.println("100 * total " + currentCount / totalCount * 100);
+        if (responseRepository.findAllByRequestId(requestId).size() == 3) {
+            return 100;
+        }
         return 100 * currentCount / totalCount;
     }
 }

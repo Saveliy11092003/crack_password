@@ -69,9 +69,7 @@ public class RabbitConfiguration {
 
     @Bean
     public CachingConnectionFactory connectionFactory() {
-        //CachingConnectionFactory connectionFactory = new CachingConnectionFactory("localhost", 5672);
         CachingConnectionFactory connectionFactory = new CachingConnectionFactory("rabbitmq1", 5672);
-        //CachingConnectionFactory connectionFactory = new CachingConnectionFactory();
         connectionFactory.setUsername("guest");
         connectionFactory.setPassword("guest");
         return connectionFactory;
@@ -79,14 +77,9 @@ public class RabbitConfiguration {
 
     @Bean
     public RabbitAdmin rabbitAdmin() {
-    //    try {
-            RabbitAdmin rabbitAdmin = new RabbitAdmin(connectionFactory());
-            rabbitAdmin.declareExchange(exchange());
-            return rabbitAdmin;
- //       } catch (Exception e) {
- //           System.err.println("RabbitAdmin init failed: " + e.getMessage());
- //           return new RabbitAdmin(connectionFactory());
- //       }
+        RabbitAdmin rabbitAdmin = new RabbitAdmin(connectionFactory());
+        rabbitAdmin.declareExchange(exchange());
+        return rabbitAdmin;
     }
 
 
@@ -119,11 +112,7 @@ public class RabbitConfiguration {
 
     @Bean(name = "receiveConnectionFactory")
     public CachingConnectionFactory receiveConnectionFactory() {
-        //CachingConnectionFactory factory = new CachingConnectionFactory("localhost", 5673);
         CachingConnectionFactory factory = new CachingConnectionFactory("rabbitmq2", 5672);
-     //   CachingConnectionFactory factory = new CachingConnectionFactory();
-        // factory.setUsername(username);
-      //  factory.setPassword(password);
         return factory;
     }
 
