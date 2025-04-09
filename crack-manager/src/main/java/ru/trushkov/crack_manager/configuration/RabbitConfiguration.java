@@ -36,16 +36,6 @@ public class RabbitConfiguration {
         return new Queue(requestQueueName1, true);
     }
 
-    @Bean("requestQueue2")
-    public Queue requestQueue2() {
-        return new Queue(requestQueueName2, true);
-    }
-
-    @Bean("requestQueue3")
-    public Queue requestQueue3() {
-        return new Queue(requestQueueName3, true);
-    }
-
     @Bean
     public DirectExchange exchange() {
         return new DirectExchange(exchangeName);
@@ -54,16 +44,6 @@ public class RabbitConfiguration {
     @Bean
     public Binding binding1(Queue requestQueue1, DirectExchange exchange) {
         return BindingBuilder.bind(requestQueue1).to(exchange).with("task.worker1");
-    }
-
-    @Bean
-    public Binding binding2(Queue requestQueue2, DirectExchange exchange) {
-        return BindingBuilder.bind(requestQueue2).to(exchange).with("task.worker2");
-    }
-
-    @Bean
-    public Binding binding3(Queue requestQueue3, DirectExchange exchange) {
-        return BindingBuilder.bind(requestQueue3).to(exchange).with("task.worker3");
     }
 
 

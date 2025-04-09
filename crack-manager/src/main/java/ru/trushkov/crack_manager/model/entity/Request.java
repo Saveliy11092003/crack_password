@@ -26,6 +26,6 @@ public class Request {
     @NotNull
     private Integer length;
 
-    private Boolean done;
+    private Boolean sent;
 
 }

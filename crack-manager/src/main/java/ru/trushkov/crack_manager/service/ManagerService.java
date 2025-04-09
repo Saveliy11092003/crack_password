@@ -1,5 +1,6 @@
 package ru.trushkov.crack_manager.service;
 
+import com.mongodb.client.MongoClient;
 import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.core.AmqpTemplate;
@@ -9,6 +10,10 @@ import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -64,6 +69,8 @@ public class ManagerService {
     @Value("${exchange.name}")
     private String exchangeName;
 
+    private final MongoTemplate mongoTemplate;
+
     public String crackPassword(CrackPasswordDto crackPasswordDto) {
         String requestId = UUID.randomUUID().toString();
         crackPasswordDto.setRequestId(requestId);
@@ -71,7 +78,10 @@ public class ManagerService {
         addRequestToBD(crackPasswordDto);
   //      addNewRequest(crackPasswordDto);
         System.out.println(getRequest(requestId));
+
         doRequests(crackPasswordDto);
+        updateRequestInBD(requestId);
+
         System.out.println("posle");
         return requestId;
     }
@@ -82,7 +92,7 @@ public class ManagerService {
 
     private void addRequestToBD(CrackPasswordDto crackPasswordDto) {
         Request request = Request.builder().id(crackPasswordDto.getRequestId()).length(crackPasswordDto.getLength())
-                .hash(crackPasswordDto.getHash()).build();
+                .hash(crackPasswordDto.getHash()).sent(false).build();
         repository.save(request);
     }
 
@@ -203,4 +213,21 @@ public class ManagerService {
         }
         return 100 * currentCount / totalCount;
     }
+
+    public void sendUnsentRequest() {
+        List<Request> unsent = repository.findAllBySentFalse();
+        unsent.forEach(request -> {
+            CrackPasswordDto crackPasswordDto = CrackPasswordDto.builder().requestId(request.getId()).hash(request.getHash())
+                            .length(request.getLength()).build();
+            doRequests(crackPasswordDto);
+            updateRequestInBD(request.getId());
+        });
+    }
+
+    public void updateRequestInBD(String requestId) {
+        Query query = new Query(Criteria.where("id").is(requestId));
+        Update update = new Update().set("sent", true);
+        mongoTemplate.updateFirst(query, update, Request.class);
+    }
+
 }

@@ -29,4 +29,9 @@ public class ManagerController {
     public ResponseEntity<Long> getPercent(@RequestParam("requestId") String requestId) {
         return ResponseEntity.ok(managerService.getPercent(requestId));
     }
+
+    @PutMapping("/update")
+    public void update(@RequestParam("requestId") String requestId) {
+        managerService.updateRequestInBD(requestId);
+    }
 }
